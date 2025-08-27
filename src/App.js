@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Link } from 'react-router-dom';
 import Home from './components/Home';
 import Registration from './components/Registration';
 import About from './components/About';
+import UserList from "./components/UserList";
 import './firebase';
 
 function App() {
@@ -26,6 +27,7 @@ function App() {
         <Route path="/" element={<Home />} />
         <Route path="/registration" element={<Registration />} />
         <Route path="/about" element={<About />} />
+        <Route path="/users" element={<UserList />} />
       </Routes>
     </BrowserRouter>
   );
