@@ -1,136 +1,138 @@
-import React, { useEffect, useState } from "react";
+// src/components/Registration.js
+import React, { useState } from "react";
 import { db } from "../firebase";
-import { collection, getDocs } from "firebase/firestore";
+import { collection, addDoc, serverTimestamp } from "firebase/firestore";
 
-function UserList() {
-  const [users, setUsers] = useState([]);
-  const [loading, setLoading] = useState(true);
+function Registration() {
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [success, setSuccess] = useState(false);
   const [error, setError] = useState("");
-  const [searchTerm, setSearchTerm] = useState("");
-  const [sortKey, setSortKey] = useState("name");
-  const [sortDir, setSortDir] = useState("asc");
 
-  const fetchUsers = async () => {
+  const validate = () => {
+    if (name.trim().length < 3) {
+      setError("Name must be at least 3 characters");
+      return false;
+    }
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      setError("Invalid email");
+      return false;
+    }
+    const phoneRegex = /^\d{10}$/;
+    if (!phoneRegex.test(phone)) {
+      setError("Phone must be exactly 10 digits (numbers only)");
+      return false;
+    }
+    setError("");
+    return true;
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!validate()) return;
+
+    setIsSubmitting(true);
+    setSuccess(false);
+    setError("");
+
     try {
-      setLoading(true);
-      setError("");
-      const snap = await getDocs(collection(db, "users"));
-      const data = snap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-      setUsers(data);
-    } catch (e) {
-      console.error(e);
-      setError("Failed to load users. Check console for details.");
+      const docRef = await addDoc(collection(db, "users"), {
+        name: name.trim(),
+        email: email.trim(),
+        phone: phone.trim(),
+        createdAt: serverTimestamp() // use server time
+      });
+
+      console.log("Document written with ID: ", docRef.id);
+      setSuccess(true);
+      // clear form
+      setName("");
+      setEmail("");
+      setPhone("");
+    } catch (err) {
+      console.error("Error adding document: ", err);
+      setError("Error submitting form. Check console for details.");
     } finally {
-      setLoading(false);
+      setIsSubmitting(false);
+      // hide success message after a short while (optional)
+      setTimeout(() => setSuccess(false), 4000);
     }
-  };
-
-  useEffect(() => {
-    fetchUsers();
-  }, []);
-
-  const filtered = users.filter((u) =>
-    (u.name || "").toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
-  const sorted = [...filtered].sort((a, b) => {
-    const av = (a[sortKey] ?? "").toString().toLowerCase();
-    const bv = (b[sortKey] ?? "").toString().toLowerCase();
-    if (av < bv) return sortDir === "asc" ? -1 : 1;
-    if (av > bv) return sortDir === "asc" ? 1 : -1;
-    return 0;
-  });
-
-  const sortBy = (key) => {
-    if (sortKey === key) {
-      setSortDir(sortDir === "asc" ? "desc" : "asc");
-    } else {
-      setSortKey(key);
-      setSortDir("asc");
-    }
-  };
-
-  const sortIcon = (key) => {
-    if (sortKey !== key) return "";
-    return sortDir === "asc" ? " ▲" : " ▼";
-    // simple text arrows; you can swap for icons later
   };
 
   return (
     <div className="container mt-5">
-      <div className="d-flex align-items-center justify-content-between mb-3">
-        <h2 className="mb-0">Registered Users</h2>
-        <button className="btn btn-outline-secondary" onClick={fetchUsers} disabled={loading}>
-          {loading ? "Refreshing..." : "Refresh"}
-        </button>
-      </div>
+      <h2>Register</h2>
 
-      {/* Search */}
-      <input
-        type="text"
-        placeholder="Search by name"
-        className="form-control mb-3"
-        value={searchTerm}
-        onChange={(e) => setSearchTerm(e.target.value)}
-      />
-
-      {/* Loading / Error states */}
-      {loading && (
-        <div className="d-flex align-items-center">
-          <div className="spinner-border me-2" role="status" aria-hidden="true"></div>
-          <span>Loading users...</span>
+      {error && (
+        <div className="alert alert-danger" role="alert">
+          {error}
         </div>
       )}
-      {error && <div className="alert alert-danger mt-2">{error}</div>}
 
-      {!loading && !error && (
-        <>
-          {/* Table (desktop/tablet) */}
-          <table className="table table-bordered table-hover table-striped d-none d-md-table">
-            <thead>
-              <tr>
-                <th role="button" onClick={() => sortBy("name")}>
-                  Name{sortIcon("name")}
-                </th>
-                <th role="button" onClick={() => sortBy("email")}>
-                  Email{sortIcon("email")}
-                </th>
-                <th role="button" onClick={() => sortBy("phone")}>
-                  Phone{sortIcon("phone")}
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {sorted.map((user) => (
-                <tr key={user.id}>
-                  <td>{user.name || "-"}</td>
-                  <td>{user.email || "-"}</td>
-                  <td>{user.phone || "-"}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-
-          {/* Cards (mobile-friendly) */}
-          <div className="d-md-none">
-            {sorted.map((user) => (
-              <div className="card mb-3" key={user.id}>
-                <div className="card-body">
-                  <h5 className="card-title mb-2">{user.name || "Unnamed"}</h5>
-                  <p className="card-text mb-1"><strong>Email:</strong> {user.email || "-"}</p>
-                  <p className="card-text"><strong>Phone:</strong> {user.phone || "-"}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {sorted.length === 0 && (
-            <div className="alert alert-info">No users found. Try a different search.</div>
-          )}
-        </>
+      {success && (
+        <div className="alert alert-success" role="alert">
+          Registration successful!
+        </div>
       )}
+
+      <form onSubmit={handleSubmit}>
+        <div className="mb-3">
+          <label className="form-label">Name</label>
+          <input
+            type="text"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            className="form-control"
+            placeholder="At least 3 characters"
+            disabled={isSubmitting}
+          />
+        </div>
+
+        <div className="mb-3">
+          <label className="form-label">Email</label>
+          <input
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            className="form-control"
+            placeholder="you@example.com"
+            disabled={isSubmitting}
+          />
+        </div>
+
+        <div className="mb-3">
+          <label className="form-label">Phone</label>
+          <input
+            type="text"
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+            className="form-control"
+            placeholder="10 digits"
+            maxLength={10}
+            disabled={isSubmitting}
+          />
+        </div>
+
+        <button type="submit" className="btn btn-success" disabled={isSubmitting}>
+          {isSubmitting ? (
+            <>
+              <span
+                className="spinner-border spinner-border-sm me-2"
+                role="status"
+                aria-hidden="true"
+              ></span>
+              Submitting...
+            </>
+          ) : (
+            "Submit"
+          )}
+        </button>
+      </form>
     </div>
   );
 }
 
-export default UserList;
+export default Registration;
